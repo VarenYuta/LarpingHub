@@ -424,14 +424,19 @@ end
 
 local function applyAvatar()
     local hum = getHumanoid()
-    if not hum then return end
+    if not hum then
+        notify("Avatar", "Karakter tidak ditemukan")
+        return
+    end
 
-    setHeadlessVisual(state.headless)
-    setKorbloxVisual(state.korblox)
-
-    local okCount, failCount = applyAccessories()
-    if failCount > 0 then
-        notify("Item", ("%d berhasil, %d gagal dipasang"):format(okCount, failCount))
+    local ok, err = pcall(function()
+        setHeadlessVisual(state.headless)
+        setKorbloxVisual(state.korblox)
+        applyAccessories()
+    end)
+    if not ok then
+        warn("[LarpingHub] " .. tostring(err))
+        notify("Error", tostring(err):sub(1, 70))
     end
 end
 
@@ -1104,7 +1109,7 @@ end))
 ------------------------------------------------------------
 task.spawn(function()
     while _G.__LarpingHub == gui and gui.Parent do
-        task.wait(3)
+        task.wait(1)
         if state.headless then
             local char = getCharacter()
             local head = char and char:FindFirstChild("Head")
