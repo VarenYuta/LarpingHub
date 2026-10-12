@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v11"
+local VERSION = "v12"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -244,6 +244,38 @@ end
 local HEADLESS_MESH = "rbxassetid://1095708"
 local headLocks = setmetatable({}, { __mode = "k" })
 
+local function setHidden(part, on)
+    if not part then return end
+    pcall(function()
+        part.Transparency = on and 1 or 0
+        part.LocalTransparencyModifier = on and 1 or 0
+    end)
+end
+
+local function setHeadAccessories(on)
+    local char = getCharacter()
+    if not char then return end
+    for _, acc in ipairs(char:GetChildren()) do
+        if acc:IsA("Accessory") and not acc:GetAttribute("LarpingHubItem") then
+            local handle = acc:FindFirstChildWhichIsA("BasePart")
+            if handle then
+                pcall(function()
+                    local t = acc.AccessoryType.Name
+                    if t == "Hair" or t == "Face" or t == "Eyebrow" or t == "Eyelash" then
+                        if on then
+                            acc:SetAttribute("LarpHeadAcc", true)
+                            handle.Transparency = 1
+                        elseif acc:GetAttribute("LarpHeadAcc") then
+                            handle.Transparency = 0
+                            acc:SetAttribute("LarpHeadAcc", nil)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end
+
 local function setHeadlessVisual(on)
     local char = getCharacter()
     if not char then return end
@@ -251,10 +283,11 @@ local function setHeadlessVisual(on)
     if not head then return end
 
     if on then
-        pcall(function() head.Transparency = 1 end)
+        setHidden(head, true)
         for _, d in ipairs(head:GetDescendants()) do
             if d:IsA("Decal") then pcall(function() d.Transparency = 1 end) end
         end
+        setHeadAccessories(true)
         if not head:FindFirstChild("LarpHeadless") then
             local m = Instance.new("SpecialMesh")
             m.Name = "LarpHeadless"
@@ -275,10 +308,11 @@ local function setHeadlessVisual(on)
     else
         local m = head:FindFirstChild("LarpHeadless")
         if m then m:Destroy() end
-        pcall(function() head.Transparency = 0 end)
+        setHidden(head, false)
         for _, d in ipairs(head:GetDescendants()) do
             if d:IsA("Decal") then pcall(function() d.Transparency = 0 end) end
         end
+        setHeadAccessories(false)
     end
 end
 
@@ -368,8 +402,9 @@ local function setKorbloxVisual(on)
     end
 
     if applied then
-        if lower then pcall(function() lower.Transparency = 1 end) end
-        if foot then pcall(function() foot.Transparency = 1 end) end
+        setHidden(upper, false)
+        setHidden(lower, true)
+        setHidden(foot, true)
         return
     end
 
@@ -401,7 +436,7 @@ local function setKorbloxVisual(on)
     weld.Parent = hack
 
     for _, p in ipairs({ upper, lower, foot }) do
-        if p then pcall(function() p.Transparency = 1 end) end
+        setHidden(p, true)
     end
 end
 
@@ -1173,12 +1208,23 @@ task.spawn(function()
         if char and char:FindFirstChildOfClass("Humanoid") then
             if state.headless then
                 local head = findPart(char, "Head")
-                if head and head.Transparency < 1 then
+                if head and (head.Transparency < 1 or head.LocalTransparencyModifier < 1) then
                     setHeadlessVisual(true)
                 end
+                setHeadAccessories(true)
             end
-            if state.korblox and not korbloxApplied() then
-                setKorbloxVisual(true)
+            if state.korblox then
+                if not korbloxApplied() then
+                    setKorbloxVisual(true)
+                end
+                local upper = findPart(char, "RightUpperLeg")
+                if upper and upper:IsA("MeshPart") then
+                    setHidden(findPart(char, "RightLowerLeg"), true)
+                    setHidden(findPart(char, "RightFoot"), true)
+                    if upper.MeshId ~= KORBLOX_R15_UPPER then
+                        setKorbloxVisual(true)
+                    end
+                end
             end
             if next(state.items) then
                 local applied = false
