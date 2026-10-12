@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v8"
+local VERSION = "v9"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -212,10 +212,14 @@ local state = {
 ------------------------------------------------------------
 local function getCharacter()
     local char = LP.Character
-    if not char or not char.Parent then
-        return nil
+    if char and char.Parent then
+        return char
     end
-    return char
+    local alt = workspace:FindFirstChild(LP.Name)
+    if alt and alt:FindFirstChildOfClass("Humanoid") then
+        return alt
+    end
+    return nil
 end
 
 local function getHumanoid()
@@ -230,7 +234,7 @@ local headLocks = setmetatable({}, { __mode = "k" })
 local function setHeadlessVisual(on)
     local char = getCharacter()
     if not char then return end
-    local head = char:FindFirstChild("Head")
+    local head = char:FindFirstChild("Head") or char:FindFirstChild("Head", true)
     if not head then return end
 
     if on then
@@ -278,20 +282,25 @@ local KORBLOX_FALLBACK = {
 
 local KORBLOX_PARTS = { "RightUpperLeg", "RightLowerLeg", "RightFoot", "Right Leg" }
 
+-- Cari part berdasarkan nama, termasuk di dalam sub-model (rig Evade kadang nested)
+local function findPart(char, ...)
+    for _, n in ipairs({ ... }) do
+        local p = char:FindFirstChild(n) or char:FindFirstChild(n, true)
+        if p and p:IsA("BasePart") then return p end
+    end
+    return nil
+end
+
 -- Hapus sisa "hack" korblox (part bantuan + mesh) tanpa mengubah transparency
 local function clearKorbloxHack()
     local char = getCharacter()
     if not char then return end
-    for _, d in ipairs(char:GetChildren()) do
+    for _, d in ipairs(char:GetDescendants()) do
         if d:IsA("BasePart") and d:GetAttribute("LarpKorbloxLeg") then
             d:Destroy()
         end
-    end
-    for _, n in ipairs(KORBLOX_PARTS) do
-        local p = char:FindFirstChild(n)
-        if p then
-            local m = p:FindFirstChild("LarpKorbloxMesh")
-            if m then m:Destroy() end
+        if d:IsA("SpecialMesh") and d.Name == "LarpKorbloxMesh" then
+            d:Destroy()
         end
     end
 end
@@ -304,7 +313,7 @@ local function setKorbloxVisual(on)
 
     if not on then
         for _, n in ipairs(KORBLOX_PARTS) do
-            local p = char:FindFirstChild(n)
+            local p = findPart(char, n)
             if p then
                 pcall(function() p.Transparency = 0 end)
                 local orig = p:GetAttribute("LarpOrigMesh")
@@ -317,8 +326,8 @@ local function setKorbloxVisual(on)
     end
 
     -- R6 : "Right Leg" adalah Part biasa -> pasang SpecialMesh korblox
-    local r6 = char:FindFirstChild("Right Leg")
-    if r6 and r6:IsA("BasePart") and not r6:IsA("MeshPart") then
+    local r6 = findPart(char, "Right Leg")
+    if r6 and not r6:IsA("MeshPart") then
         local mesh = Instance.new("SpecialMesh")
         mesh.Name = "LarpKorbloxMesh"
         mesh.MeshType = Enum.MeshType.FileMesh
@@ -330,10 +339,10 @@ local function setKorbloxVisual(on)
     end
 
     -- R15 : tulis MeshId langsung (executor umumnya mengizinkan)
-    local upper = char:FindFirstChild("RightUpperLeg")
-    if not upper or not upper:IsA("BasePart") then return end
-    local lower = char:FindFirstChild("RightLowerLeg")
-    local foot = char:FindFirstChild("RightFoot")
+    local upper = findPart(char, "RightUpperLeg")
+    if not upper then return end
+    local lower = findPart(char, "RightLowerLeg")
+    local foot = findPart(char, "RightFoot")
 
     local applied = false
     if upper:IsA("MeshPart") then
@@ -435,27 +444,39 @@ local function applyAccessories()
 end
 
 local function applyAvatar()
-    local hum = getHumanoid()
-    if not hum then
-        notify("Avatar", "Karakter tidak ditemukan")
+    local function run()
+        local ok, err = pcall(function()
+            setHeadlessVisual(state.headless)
+            setKorbloxVisual(state.korblox)
+            applyAccessories()
+        end)
+        if not ok then
+            warn("[LarpingHub] " .. tostring(err))
+            notify("Error", tostring(err):sub(1, 70))
+        end
+    end
+
+    if getHumanoid() then
+        run()
         return
     end
 
-    local ok, err = pcall(function()
-        setHeadlessVisual(state.headless)
-        setKorbloxVisual(state.korblox)
-        applyAccessories()
+    task.spawn(function()
+        for _ = 1, 24 do
+            task.wait(0.5)
+            if getHumanoid() then
+                run()
+                return
+            end
+        end
+        notify("Avatar", "Karakter tidak ditemukan")
     end)
-    if not ok then
-        warn("[LarpingHub] " .. tostring(err))
-        notify("Error", tostring(err):sub(1, 70))
-    end
 end
 
 local function hasKorbloxHack()
     local char = getCharacter()
     if not char then return false end
-    for _, d in ipairs(char:GetChildren()) do
+    for _, d in ipairs(char:GetDescendants()) do
         if d:IsA("BasePart") and d:GetAttribute("LarpKorbloxLeg") then
             return true
         end
@@ -466,11 +487,11 @@ end
 local function korbloxApplied()
     local char = getCharacter()
     if not char then return false end
-    local r6 = char:FindFirstChild("Right Leg")
-    if r6 and r6:IsA("BasePart") and not r6:IsA("MeshPart") then
+    local r6 = findPart(char, "Right Leg")
+    if r6 and not r6:IsA("MeshPart") then
         return r6:FindFirstChild("LarpKorbloxMesh") ~= nil
     end
-    local upper = char:FindFirstChild("RightUpperLeg")
+    local upper = findPart(char, "RightUpperLeg")
     if not upper then return false end
     if upper:IsA("MeshPart") and upper.MeshId == KORBLOX_R15_UPPER then
         return true
@@ -1124,7 +1145,7 @@ task.spawn(function()
         task.wait(1)
         if state.headless then
             local char = getCharacter()
-            local head = char and char:FindFirstChild("Head")
+            local head = char and findPart(char, "Head")
             if head and head.Transparency < 1 then
                 setHeadlessVisual(true)
             end
@@ -1146,18 +1167,25 @@ task.spawn(function()
     if hum then
         rig = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
     end
-    local head = char and char:FindFirstChild("Head")
-    local leg  = char and (char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg"))
+    local head = char and findPart(char, "Head")
+    local leg  = char and findPart(char, "RightUpperLeg", "Right Leg")
     local hasHead = head and "ada" or "tidak"
     local hasLeg  = leg and "ada" or "tidak"
+    local names = {}
+    if char then
+        for _, c in ipairs(char:GetChildren()) do
+            table.insert(names, c.Name)
+        end
+    end
     local lvl = "?"
     pcall(function() lvl = tostring(getidentity()) end)
     local cap = {}
     if getcustomasset then table.insert(cap, "customasset") end
     if game.GetObjects then table.insert(cap, "GetObjects") end
-    print(("[LarpingHub %s] char=%s rig=%s head=%s kaki=%s identity=%s cap=%s"):format(
-        VERSION, tostring(char ~= nil), rig, hasHead, hasLeg, lvl, table.concat(cap, ",")))
-    notify("Diagnostik " .. VERSION, ("%s | kepala %s | kaki %s | lvl %s"):format(rig, hasHead, hasLeg, lvl))
+    print(("[LarpingHub %s] char=%s rig=%s head=%s kaki=%s identity=%s cap=%s anak=%s"):format(
+        VERSION, tostring(char ~= nil), rig, hasHead, hasLeg, lvl, table.concat(cap, ","), table.concat(names, "/")))
+    notify("Diagnostik " .. VERSION, ("char %s | %s | kepala %s | kaki %s"):format(
+        tostring(char ~= nil), rig, hasHead, hasLeg))
 end)
 
 ------------------------------------------------------------
