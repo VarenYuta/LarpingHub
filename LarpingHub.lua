@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v9"
+local VERSION = "v10"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -218,6 +218,14 @@ local function getCharacter()
     local alt = workspace:FindFirstChild(LP.Name)
     if alt and alt:FindFirstChildOfClass("Humanoid") then
         return alt
+    end
+    for _, d in ipairs(workspace:GetChildren()) do
+        if d:IsA("Model") and d:FindFirstChildOfClass("Humanoid") then
+            local n = d.Name:lower()
+            if n == LP.Name:lower() or n:find(LP.Name:lower(), 1, true) then
+                return d
+            end
+        end
     end
     return nil
 end
@@ -1143,15 +1151,29 @@ end))
 task.spawn(function()
     while _G.__LarpingHub == gui and gui.Parent do
         task.wait(1)
-        if state.headless then
-            local char = getCharacter()
-            local head = char and findPart(char, "Head")
-            if head and head.Transparency < 1 then
-                setHeadlessVisual(true)
+        local char = getCharacter()
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            if state.headless then
+                local head = findPart(char, "Head")
+                if head and head.Transparency < 1 then
+                    setHeadlessVisual(true)
+                end
             end
-        end
-        if state.korblox and not korbloxApplied() then
-            setKorbloxVisual(true)
+            if state.korblox and not korbloxApplied() then
+                setKorbloxVisual(true)
+            end
+            if next(state.items) then
+                local applied = false
+                for _, d in ipairs(char:GetChildren()) do
+                    if d:IsA("Accessory") and d:GetAttribute("LarpingHubItem") then
+                        applied = true
+                        break
+                    end
+                end
+                if not applied then
+                    applyAccessories()
+                end
+            end
         end
     end
 end)
@@ -1160,8 +1182,13 @@ end)
 -- DIAGNOSTIK (detail di console F9)
 ------------------------------------------------------------
 task.spawn(function()
-    task.wait(1)
-    local char = getCharacter()
+    local char, tries = nil, 0
+    repeat
+        char = getCharacter()
+        if char and char:FindFirstChildOfClass("Humanoid") then break end
+        tries = tries + 1
+        task.wait(0.5)
+    until tries >= 120
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local rig = "?"
     if hum then
@@ -1177,13 +1204,18 @@ task.spawn(function()
             table.insert(names, c.Name)
         end
     end
+    local wnames = {}
+    for _, c in ipairs(workspace:GetChildren()) do
+        table.insert(wnames, c.Name)
+    end
     local lvl = "?"
     pcall(function() lvl = tostring(getidentity()) end)
     local cap = {}
     if getcustomasset then table.insert(cap, "customasset") end
     if game.GetObjects then table.insert(cap, "GetObjects") end
-    print(("[LarpingHub %s] char=%s rig=%s head=%s kaki=%s identity=%s cap=%s anak=%s"):format(
-        VERSION, tostring(char ~= nil), rig, hasHead, hasLeg, lvl, table.concat(cap, ","), table.concat(names, "/")))
+    print(("[LarpingHub %s] player=%s char=%s rig=%s head=%s kaki=%s identity=%s cap=%s anak=%s ws=%s"):format(
+        VERSION, LP.Name, tostring(char ~= nil), rig, hasHead, hasLeg, lvl,
+        table.concat(cap, ","), table.concat(names, "/"), table.concat(wnames, "/")))
     notify("Diagnostik " .. VERSION, ("char %s | %s | kepala %s | kaki %s"):format(
         tostring(char ~= nil), rig, hasHead, hasLeg))
 end)
