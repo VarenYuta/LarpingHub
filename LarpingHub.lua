@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v13"
+local VERSION = "v14"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -215,22 +215,43 @@ local function getCharacter()
     if char and char.Parent then
         return char
     end
-    local alt = workspace:FindFirstChild(LP.Name)
-    if alt and alt:FindFirstChildOfClass("Humanoid") then
-        return alt
+    for _, name in ipairs({ LP.Name, LP.DisplayName }) do
+        local alt = workspace:FindFirstChild(name)
+        if alt and alt:FindFirstChildOfClass("Humanoid") then
+            return alt
+        end
     end
-    for _, d in ipairs(workspace:GetChildren()) do
-        if d:IsA("Model") and d:FindFirstChildOfClass("Humanoid") then
-            local n = d.Name:lower()
-            if n == LP.Name:lower() or n:find(LP.Name:lower(), 1, true) then
-                return d
+    local nlower = {}
+    for _, name in ipairs({ LP.Name, LP.DisplayName }) do
+        if name and name ~= "" then
+            table.insert(nlower, name:lower())
+        end
+    end
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("Humanoid") then
+            local m = d.Parent
+            if m and m.Parent and m.Name then
+                local n = m.Name:lower()
+                for _, nl in ipairs(nlower) do
+                    if n == nl or n:find(nl, 1, true) then
+                        return m
+                    end
+                end
             end
         end
     end
     local cam = workspace.CurrentCamera
     local subj = cam and cam.CameraSubject
-    if subj and subj:IsA("Humanoid") and subj.Parent then
-        return subj.Parent
+    local from = subj
+    while from and from ~= workspace do
+        if from:IsA("Humanoid") and from.Parent then
+            return from.Parent
+        end
+        local h = from:FindFirstChildOfClass("Humanoid")
+        if h and h.Parent and h.Parent.Parent then
+            return h.Parent
+        end
+        from = from.Parent
     end
     return nil
 end
@@ -356,6 +377,20 @@ local function findPart(char, ...)
     return nil
 end
 
+local meshLocks = setmetatable({}, { __mode = "k" })
+
+local function lockMesh(part)
+    if not part or meshLocks[part] then return end
+    pcall(function()
+        meshLocks[part] = part:GetPropertyChangedSignal("MeshId"):Connect(function()
+            if state.korblox and part:IsA("MeshPart") and part.MeshId ~= KORBLOX_R15_UPPER then
+                part.MeshId = KORBLOX_R15_UPPER
+                part.TextureID = KORBLOX_TEXTURE
+            end
+        end)
+    end)
+end
+
 -- Hapus sisa "hack" korblox (part bantuan + mesh) tanpa mengubah transparency
 local function clearKorbloxHack()
     local char = getCharacter()
@@ -425,6 +460,7 @@ local function setKorbloxVisual(on)
         setHidden(foot, true)
         lockHidden(lower)
         lockHidden(foot)
+        lockMesh(upper)
         return
     end
 
@@ -1224,41 +1260,44 @@ end))
 ------------------------------------------------------------
 task.spawn(function()
     while _G.__LarpingHub == gui and gui.Parent do
-        task.wait(1)
+        task.wait(0.5)
         local char = getCharacter()
         if char and char:FindFirstChildOfClass("Humanoid") then
-            if state.headless then
-                local head = findPart(char, "Head")
-                if head and (head.Transparency < 1 or head.LocalTransparencyModifier < 1) then
-                    setHeadlessVisual(true)
+            pcall(function()
+                if state.headless then
+                    local head = findPart(char, "Head")
+                    if head and (head.Transparency < 1 or head.LocalTransparencyModifier < 1) then
+                        setHeadlessVisual(true)
+                    end
+                    setHeadAccessories(true)
                 end
-                setHeadAccessories(true)
-            end
-            if state.korblox then
-                if not korbloxApplied() then
-                    setKorbloxVisual(true)
-                end
-                local upper = findPart(char, "RightUpperLeg")
-                if upper and upper:IsA("MeshPart") then
-                    setHidden(findPart(char, "RightLowerLeg"), true)
-                    setHidden(findPart(char, "RightFoot"), true)
-                    if upper.MeshId ~= KORBLOX_R15_UPPER then
+                if state.korblox then
+                    local upper = findPart(char, "RightUpperLeg")
+                    if not korbloxApplied() then
                         setKorbloxVisual(true)
+                    elseif upper and upper:IsA("MeshPart") then
+                        setHidden(findPart(char, "RightLowerLeg"), true)
+                        setHidden(findPart(char, "RightFoot"), true)
+                        lockHidden(findPart(char, "RightLowerLeg"))
+                        lockHidden(findPart(char, "RightFoot"))
+                        if upper.MeshId ~= KORBLOX_R15_UPPER then
+                            setKorbloxVisual(true)
+                        end
                     end
                 end
-            end
-            if next(state.items) then
-                local applied = false
-                for _, d in ipairs(char:GetChildren()) do
-                    if d:IsA("Accessory") and d:GetAttribute("LarpingHubItem") then
-                        applied = true
-                        break
+                if next(state.items) then
+                    local applied = false
+                    for _, d in ipairs(char:GetChildren()) do
+                        if d:IsA("Accessory") and d:GetAttribute("LarpingHubItem") then
+                            applied = true
+                            break
+                        end
+                    end
+                    if not applied then
+                        applyAccessories()
                     end
                 end
-                if not applied then
-                    applyAccessories()
-                end
-            end
+            end)
         end
     end
 end)
@@ -1324,9 +1363,15 @@ task.spawn(function()
         if head then headTxt = (head.Transparency >= 1) and "hilang" or "kelihatan" end
         local kxTxt = "-"
         if state.korblox then kxTxt = korbloxApplied() and "OK" or "GAGAL" end
-        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkaki: %s\nkorblox: %s\nlvl: %s"):format(
+        local wsTxt = {}
+        for _, c in ipairs(workspace:GetChildren()) do
+            if c:IsA("Model") then table.insert(wsTxt, c.Name) end
+            if #wsTxt >= 4 then break end
+        end
+        local wsLine = (#wsTxt > 0) and table.concat(wsTxt, " • ") or "kosong"
+        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkaki: %s\nkorblox: %s\nws: %s\nlvl: %s"):format(
             char and "ada" or "TIDAK", rig, headTxt,
-            leg and "ada" or "TIDAK", kxTxt, lvl)
+            leg and "ada" or "TIDAK", kxTxt, wsLine, lvl)
         task.wait(1)
     end
 end)
