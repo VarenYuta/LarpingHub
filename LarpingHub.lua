@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v15"
+local VERSION = "v16"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -262,6 +262,31 @@ local function getHumanoid()
     return char:FindFirstChildOfClass("Humanoid")
 end
 
+-- Cari part berdasarkan nama, termasuk di dalam sub-model (rig Evade kadang nested)
+local function findPart(char, ...)
+    for _, n in ipairs({ ... }) do
+        local p = char:FindFirstChild(n) or char:FindFirstChild(n, true)
+        if p and p:IsA("BasePart") then return p end
+    end
+    return nil
+end
+
+local function findHead(char)
+    local h = findPart(char, "Head")
+    if h then return h end
+    for _, d in ipairs(char:GetDescendants()) do
+        if d:IsA("BasePart") and d.Name:lower():find("head", 1, true) then
+            return d
+        end
+    end
+    for _, d in ipairs(char:GetDescendants()) do
+        if d:IsA("Decal") and d.Name:lower() == "face" and d.Parent:IsA("BasePart") then
+            return d.Parent
+        end
+    end
+    return nil
+end
+
 local HEADLESS_MESH = "rbxassetid://1095708"
 local headLocks = setmetatable({}, { __mode = "k" })
 
@@ -291,34 +316,10 @@ local function lockHidden(part)
     end)
 end
 
-local function setHeadAccessories(on)
-    local char = getCharacter()
-    if not char then return end
-    for _, acc in ipairs(char:GetChildren()) do
-        if acc:IsA("Accessory") and not acc:GetAttribute("LarpingHubItem") then
-            local handle = acc:FindFirstChildWhichIsA("BasePart")
-            if handle then
-                pcall(function()
-                    local t = acc.AccessoryType.Name
-                    if t == "Hair" or t == "Face" or t == "Eyebrow" or t == "Eyelash" then
-                        if on then
-                            acc:SetAttribute("LarpHeadAcc", true)
-                            handle.Transparency = 1
-                        elseif acc:GetAttribute("LarpHeadAcc") then
-                            handle.Transparency = 0
-                            acc:SetAttribute("LarpHeadAcc", nil)
-                        end
-                    end
-                end)
-            end
-        end
-    end
-end
-
 local function setHeadlessVisual(on)
     local char = getCharacter()
     if not char then return end
-    local head = char:FindFirstChild("Head") or char:FindFirstChild("Head", true)
+    local head = findHead(char)
     if not head then return end
 
     if on then
@@ -326,7 +327,6 @@ local function setHeadlessVisual(on)
         for _, d in ipairs(head:GetDescendants()) do
             if d:IsA("Decal") then pcall(function() d.Transparency = 1 end) end
         end
-        setHeadAccessories(true)
         if not head:FindFirstChild("LarpHeadless") then
             local m = Instance.new("SpecialMesh")
             m.Name = "LarpHeadless"
@@ -351,14 +351,14 @@ local function setHeadlessVisual(on)
         for _, d in ipairs(head:GetDescendants()) do
             if d:IsA("Decal") then pcall(function() d.Transparency = 0 end) end
         end
-        setHeadAccessories(false)
     end
 end
 
 -- Mesh korblox: R6 -> ganti "Right Leg"; R15 -> mesh kaki kanan penuh
-local KORBLOX_MESH      = "rbxassetid://902942096"
-local KORBLOX_TEXTURE   = "rbxassetid://902843398"
-local KORBLOX_R15_UPPER = "rbxassetid://9598310133"
+local KORBLOX_MESH        = "rbxassetid://101851696"
+local KORBLOX_TEXTURE     = "rbxassetid://101851254"
+local KORBLOX_R15_UPPER   = "rbxassetid://9598310133"
+local KORBLOX_R15_TEXTURE = "rbxassetid://902843398"
 
 -- Part bantuan dipakai hanya kalau executor tidak bisa menulis MeshId.
 local KORBLOX_FALLBACK = {
@@ -368,15 +368,6 @@ local KORBLOX_FALLBACK = {
 
 local KORBLOX_PARTS = { "RightUpperLeg", "RightLowerLeg", "RightFoot", "Right Leg" }
 
--- Cari part berdasarkan nama, termasuk di dalam sub-model (rig Evade kadang nested)
-local function findPart(char, ...)
-    for _, n in ipairs({ ... }) do
-        local p = char:FindFirstChild(n) or char:FindFirstChild(n, true)
-        if p and p:IsA("BasePart") then return p end
-    end
-    return nil
-end
-
 local meshLocks = setmetatable({}, { __mode = "k" })
 
 local function lockMesh(part)
@@ -385,7 +376,7 @@ local function lockMesh(part)
         meshLocks[part] = part:GetPropertyChangedSignal("MeshId"):Connect(function()
             if state.korblox and part:IsA("MeshPart") and part.MeshId ~= KORBLOX_R15_UPPER then
                 part.MeshId = KORBLOX_R15_UPPER
-                part.TextureID = KORBLOX_TEXTURE
+                part.TextureID = KORBLOX_R15_TEXTURE
             end
         end)
     end)
@@ -449,7 +440,7 @@ local function setKorbloxVisual(on)
         pcall(function() upper:SetAttribute("LarpOrigMesh", upper.MeshId) end)
         pcall(function()
             upper.MeshId = KORBLOX_R15_UPPER
-            upper.TextureID = KORBLOX_TEXTURE
+            upper.TextureID = KORBLOX_R15_TEXTURE
         end)
         applied = upper.MeshId == KORBLOX_R15_UPPER
     end
@@ -550,14 +541,20 @@ end
 
 local function applyAvatar()
     local function run()
-        local ok, err = pcall(function()
+        local ok, err, okA, failA = pcall(function()
             setHeadlessVisual(state.headless)
             setKorbloxVisual(state.korblox)
-            applyAccessories()
+            return applyAccessories()
         end)
         if not ok then
             warn("[LarpingHub] " .. tostring(err))
             notify("Error", tostring(err):sub(1, 70))
+        elseif okA and (okA > 0 or failA > 0) then
+            if failA == 0 then
+                notify("Item", okA .. " item terpasang")
+            else
+                notify("Item", okA .. " terpasang, " .. failA .. " gagal")
+            end
         end
     end
 
@@ -1265,11 +1262,10 @@ task.spawn(function()
         if char and char:FindFirstChildOfClass("Humanoid") then
             pcall(function()
                 if state.headless then
-                    local head = findPart(char, "Head")
+                    local head = findHead(char)
                     if head and (head.Transparency < 1 or head.LocalTransparencyModifier < 1) then
                         setHeadlessVisual(true)
                     end
-                    setHeadAccessories(true)
                 end
                 if state.korblox then
                     local upper = findPart(char, "RightUpperLeg")
@@ -1318,7 +1314,7 @@ task.spawn(function()
     if hum then
         rig = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
     end
-    local head = char and findPart(char, "Head")
+    local head = char and findHead(char)
     local leg  = char and findPart(char, "RightUpperLeg", "Right Leg")
     local hasHead = head and "ada" or "tidak"
     local hasLeg  = leg and "ada" or "tidak"
@@ -1355,7 +1351,7 @@ task.spawn(function()
         if hum then
             rig = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
         end
-        local head = char and findPart(char, "Head")
+        local head = char and findHead(char)
         local leg  = char and findPart(char, "RightUpperLeg", "Right Leg")
         local lvl = "?"
         pcall(function() lvl = tostring(getidentity()) end)
