@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v10"
+local VERSION = "v11"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -226,6 +226,11 @@ local function getCharacter()
                 return d
             end
         end
+    end
+    local cam = workspace.CurrentCamera
+    local subj = cam and cam.CameraSubject
+    if subj and subj:IsA("Humanoid") and subj.Parent then
+        return subj.Parent
     end
     return nil
 end
@@ -720,6 +725,19 @@ new("TextLabel", sidebar, {
     TextColor3 = COL.sub,
     TextXAlignment = Enum.TextXAlignment.Left,
     Text = "MENU",
+})
+
+local statusLabel = new("TextLabel", sidebar, {
+    BackgroundTransparency = 1,
+    Position = UDim2.new(0, 12, 1, -76),
+    Size = UDim2.new(1, -24, 0, 66),
+    Font = FONT,
+    TextSize = 11,
+    TextColor3 = COL.sub,
+    TextWrapped = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    Text = "status...",
 })
 
 -- CONTENT
@@ -1218,6 +1236,28 @@ task.spawn(function()
         table.concat(cap, ","), table.concat(names, "/"), table.concat(wnames, "/")))
     notify("Diagnostik " .. VERSION, ("char %s | %s | kepala %s | kaki %s"):format(
         tostring(char ~= nil), rig, hasHead, hasLeg))
+end)
+
+------------------------------------------------------------
+-- STATUS LIVE (tampil di sidebar)
+------------------------------------------------------------
+task.spawn(function()
+    while _G.__LarpingHub == gui and gui.Parent do
+        local char = getCharacter()
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local rig = "?"
+        if hum then
+            rig = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
+        end
+        local head = char and findPart(char, "Head")
+        local leg  = char and findPart(char, "RightUpperLeg", "Right Leg")
+        local lvl = "?"
+        pcall(function() lvl = tostring(getidentity()) end)
+        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkaki: %s\nlvl: %s"):format(
+            char and "ada" or "TIDAK", rig, head and "ada" or "TIDAK",
+            leg and "ada" or "TIDAK", lvl)
+        task.wait(1)
+    end
 end)
 
 ------------------------------------------------------------
