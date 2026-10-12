@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v16"
+local VERSION = "v17"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -342,6 +342,11 @@ local function setHeadlessVisual(on)
                         head.Transparency = 1
                     end
                 end)
+                head:GetPropertyChangedSignal("LocalTransparencyModifier"):Connect(function()
+                    if state.headless and head.LocalTransparencyModifier < 1 then
+                        head.LocalTransparencyModifier = 1
+                    end
+                end)
             end)
         end
     else
@@ -416,16 +421,32 @@ local function setKorbloxVisual(on)
         return
     end
 
-    -- R6 : "Right Leg" adalah Part biasa -> pasang SpecialMesh korblox
+    -- R6 : "Right Leg" adalah Part biasa -> sembunyikan, pasang part korblox ter-weld
     local r6 = findPart(char, "Right Leg")
     if r6 and not r6:IsA("MeshPart") then
+        setHidden(r6, true)
+        lockHidden(r6)
+        local hack = Instance.new("Part")
+        hack.Name = "LarpKorbloxLeg"
+        hack.Size = KORBLOX_FALLBACK.size
+        hack.CanCollide = false
+        hack.CanTouch = false
+        hack.Massless = true
+        hack.Color = KORBLOX_FALLBACK.color
+        hack.TopSurface = Enum.SurfaceType.Smooth
+        hack.BottomSurface = Enum.SurfaceType.Smooth
+        hack:SetAttribute("LarpKorbloxLeg", true)
         local mesh = Instance.new("SpecialMesh")
-        mesh.Name = "LarpKorbloxMesh"
         mesh.MeshType = Enum.MeshType.FileMesh
         mesh.MeshId = KORBLOX_MESH
         mesh.TextureId = KORBLOX_TEXTURE
-        mesh.Parent = r6
-        pcall(function() r6.Color = KORBLOX_FALLBACK.color end)
+        mesh.Parent = hack
+        hack.CFrame = r6.CFrame
+        hack.Parent = char
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = r6
+        weld.Part1 = hack
+        weld.Parent = hack
         return
     end
 
@@ -591,7 +612,7 @@ local function korbloxApplied()
     if not char then return false end
     local r6 = findPart(char, "Right Leg")
     if r6 and not r6:IsA("MeshPart") then
-        return r6:FindFirstChild("LarpKorbloxMesh") ~= nil
+        return hasKorbloxHack()
     end
     local upper = findPart(char, "RightUpperLeg")
     if not upper then return false end
