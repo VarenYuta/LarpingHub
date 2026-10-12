@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v14"
+local VERSION = "v15"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -821,8 +821,8 @@ new("TextLabel", sidebar, {
 
 local statusLabel = new("TextLabel", sidebar, {
     BackgroundTransparency = 1,
-    Position = UDim2.new(0, 12, 1, -76),
-    Size = UDim2.new(1, -24, 0, 66),
+    Position = UDim2.new(0, 12, 1, -132),
+    Size = UDim2.new(1, -24, 0, 122),
     Font = FONT,
     TextSize = 11,
     TextColor3 = COL.sub,
@@ -1363,15 +1363,25 @@ task.spawn(function()
         if head then headTxt = (head.Transparency >= 1) and "hilang" or "kelihatan" end
         local kxTxt = "-"
         if state.korblox then kxTxt = korbloxApplied() and "OK" or "GAGAL" end
-        local wsTxt = {}
-        for _, c in ipairs(workspace:GetChildren()) do
-            if c:IsA("Model") then table.insert(wsTxt, c.Name) end
-            if #wsTxt >= 4 then break end
+        local anakTxt = {}
+        if char then
+            for _, c in ipairs(char:GetChildren()) do
+                table.insert(anakTxt, c.Name)
+                if #anakTxt >= 5 then break end
+            end
         end
-        local wsLine = (#wsTxt > 0) and table.concat(wsTxt, " • ") or "kosong"
-        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkaki: %s\nkorblox: %s\nws: %s\nlvl: %s"):format(
+        local partTxt = {}
+        if char then
+            for _, c in ipairs(char:GetChildren()) do
+                if c:IsA("BasePart") then table.insert(partTxt, c.Name) end
+                if #partTxt >= 4 then break end
+            end
+        end
+        local anakLine = (#anakTxt > 0) and table.concat(anakTxt, " • ") or "kosong"
+        local partLine = (#partTxt > 0) and table.concat(partTxt, " • ") or "kosong"
+        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkorblox: %s\npart: %s\nanak: %s\nlvl: %s"):format(
             char and "ada" or "TIDAK", rig, headTxt,
-            leg and "ada" or "TIDAK", kxTxt, wsLine, lvl)
+            kxTxt, partLine, anakLine, lvl)
         task.wait(1)
     end
 end)
