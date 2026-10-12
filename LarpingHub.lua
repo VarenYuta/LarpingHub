@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v22"
+local VERSION = "v23"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -126,6 +126,14 @@ new("UIListLayout", notifLayer, {
 })
 
 local notifCounter = 0
+local function dumpError(line)
+    warn("[LarpingHub] " .. tostring(line))
+    local ok = pcall(function()
+        setclipboard("LarpingHub error: " .. tostring(line))
+    end)
+    return ok
+end
+
 local function notify(title, text)
     notifCounter = notifCounter + 1
     local card = new("CanvasGroup", notifLayer, {
@@ -442,7 +450,7 @@ local function setKorbloxVisual(on)
         mesh.MeshType = Enum.MeshType.FileMesh
         mesh.MeshId = KORBLOX_MESH
         mesh.TextureId = KORBLOX_TEXTURE
-        mesh.Offset = Vector3.new(0, 0.6, 0)
+        mesh.Offset = Vector3.new(0, 1.1, 0)
         mesh.Parent = hack
         hack.CFrame = r6.CFrame
         hack.Parent = char
@@ -647,7 +655,7 @@ local function applyAccessories()
 
     if #errAcc > 0 then
         lastErr = table.concat(errAcc, " | ")
-        warn("[LarpingHub] " .. lastErr)
+        dumpError(lastErr)
         notify("Item Error", errAcc[1]:sub(1, 300))
     end
     return okCount, failCount
@@ -661,13 +669,13 @@ local function applyAvatar()
         ok, err = pcall(setHeadlessVisual, state.headless)
         if not ok then
             lastErr = ("headless: %s"):format(tostring(err))
-            warn("[LarpingHub] " .. lastErr)
+            dumpError(lastErr)
         end
 
         ok, err = pcall(setKorbloxVisual, state.korblox)
         if not ok then
             lastErr = ("korblox: %s"):format(tostring(err))
-            warn("[LarpingHub] " .. lastErr)
+            dumpError(lastErr)
             notify("Korblox Error", tostring(err):sub(1, 160))
         end
 
@@ -676,7 +684,7 @@ local function applyAvatar()
         end)
         if not ok then
             lastErr = ("item: %s"):format(tostring(err))
-            warn("[LarpingHub] " .. lastErr)
+            dumpError(lastErr)
             notify("Item Error", tostring(err):sub(1, 160))
         end
 
@@ -1396,6 +1404,11 @@ task.spawn(function()
                     local head = findHead(char)
                     if head and (head.Transparency < 1 or head.LocalTransparencyModifier < 1) then
                         setHeadlessVisual(true)
+                    end
+                else
+                    local head = findHead(char)
+                    if head and (head.Transparency >= 1 or head.LocalTransparencyModifier >= 1) then
+                        setHeadlessVisual(false)
                     end
                 end
                 if state.korblox then
