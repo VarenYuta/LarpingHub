@@ -43,17 +43,18 @@ end
 -- TEMA
 ------------------------------------------------------------
 local COL = {
-    bg      = Color3.fromRGB(32, 28, 50),
-    panel   = Color3.fromRGB(42, 37, 66),
-    panel2  = Color3.fromRGB(54, 48, 84),
-    row     = Color3.fromRGB(48, 43, 72),
-    accent  = Color3.fromRGB(140, 106, 255),
-    accent2 = Color3.fromRGB(99, 70, 214),
-    text    = Color3.fromRGB(242, 240, 252),
-    sub     = Color3.fromRGB(180, 174, 208),
-    stroke  = Color3.fromRGB(70, 63, 104),
-    rail    = Color3.fromRGB(84, 77, 122),
+    bg      = Color3.fromRGB(0, 0, 0),
+    panel   = Color3.fromRGB(12, 12, 12),
+    panel2  = Color3.fromRGB(20, 20, 20),
+    row     = Color3.fromRGB(26, 26, 26),
+    accent  = Color3.fromRGB(235, 235, 235),
+    accent2 = Color3.fromRGB(190, 190, 190),
+    text    = Color3.fromRGB(240, 240, 240),
+    sub     = Color3.fromRGB(150, 150, 150),
+    stroke  = Color3.fromRGB(50, 50, 50),
+    rail    = Color3.fromRGB(70, 70, 70),
     white   = Color3.fromRGB(255, 255, 255),
+    transp  = 0.15,
 }
 local FONT  = Enum.Font.GothamMedium
 local FONTB = Enum.Font.GothamBold
@@ -196,7 +197,7 @@ local AVATAR_ITEMS = {
     { key = "poison",   name = "Poisoned Horns",                asset = 18748455332,    slot = "HatAccessory" },
     { key = "silver",   name = "Silver King of the Night",      asset = 439945661,      slot = "HatAccessory" },
     { key = "lord",     name = "Lord of the Federation",        asset = 88885069,       slot = "HatAccessory" },
-    { key = "hearts",   name = "Heart Shades Bobux Cloud",      asset = 83672858218486, slot = "FaceAccessory" },
+    { key = "hearts",   name = "Heart Shades Bobux Cloud",      asset = 83672858218486, slot = "HatAccessory" },
     { key = "ufo",      name = "Hovering UFO",                  asset = 18508833635,    slot = "HatAccessory" },
 }
 
@@ -380,18 +381,27 @@ end
 
 local function applyAccessories()
     local hum = getHumanoid()
-    if not hum then return end
+    if not hum then return 0, 0 end
     clearAccessories()
+    local okCount, failCount = 0, 0
     for _, it in ipairs(AVATAR_ITEMS) do
         if it.asset and it.slot and state.items[it.key] then
             local acc = loadAccessoryModel(it.asset)
             if acc then
                 acc:SetAttribute("LarpingHubItem", true)
                 local ok = pcall(function() hum:AddAccessory(acc) end)
-                if not ok then acc:Destroy() end
+                if ok then
+                    okCount = okCount + 1
+                else
+                    acc:Destroy()
+                    failCount = failCount + 1
+                end
+            else
+                failCount = failCount + 1
             end
         end
     end
+    return okCount, failCount
 end
 
 local useFallback = false
@@ -438,10 +448,14 @@ local function applyAvatar()
     else
         setHeadlessVisual(state.headless)
         setKorbloxVisual(state.korblox)
+        notify("Avatar", "Game blokir avatar - pakai mode visual")
     end
 
     -- 3) aksesoris dipasang manual
-    applyAccessories()
+    local okCount, failCount = applyAccessories()
+    if failCount > 0 then
+        notify("Item", ("%d berhasil, %d gagal dipasang"):format(okCount, failCount))
+    end
 end
 
 local function hasKorbloxHack()
@@ -565,7 +579,7 @@ local win = new("Frame", gui, {
     Position = UDim2.fromScale(0.5, 0.5),
     Size = UDim2.fromOffset(W, H),
     BackgroundColor3 = COL.bg,
-    BackgroundTransparency = 0,
+    BackgroundTransparency = COL.transp,
     BorderSizePixel = 0,
     ClipsDescendants = true,
     Visible = false,
@@ -574,19 +588,20 @@ corner(win, 14)
 stroke(win, COL.stroke, 1)
 new("UIGradient", win, {
     Rotation = 90,
-    Color = ColorSequence.new(Color3.fromRGB(56, 49, 88), Color3.fromRGB(28, 24, 44)),
+    Color = ColorSequence.new(Color3.fromRGB(22, 22, 22), Color3.fromRGB(0, 0, 0)),
 })
 
 -- HEADER
 local header = new("Frame", win, {
     Size = UDim2.new(1, 0, 0, 48),
     BackgroundColor3 = COL.panel2,
+    BackgroundTransparency = COL.transp,
     BorderSizePixel = 0,
     Active = true,
 })
 new("UIGradient", header, {
     Rotation = 90,
-    Color = ColorSequence.new(Color3.fromRGB(62, 54, 96), Color3.fromRGB(40, 35, 62)),
+    Color = ColorSequence.new(Color3.fromRGB(28, 28, 28), Color3.fromRGB(6, 6, 6)),
 })
 new("Frame", header, {
     Size = UDim2.new(1, 0, 0, 2),
@@ -655,6 +670,7 @@ local body = new("Frame", win, {
 local sidebar = new("Frame", body, {
     Size = UDim2.new(0, 176, 1, 0),
     BackgroundColor3 = COL.panel,
+    BackgroundTransparency = COL.transp,
     BorderSizePixel = 0,
 })
 new("TextLabel", sidebar, {
