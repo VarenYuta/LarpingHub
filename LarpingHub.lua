@@ -183,9 +183,6 @@ end
 ------------------------------------------------------------
 -- DATA AVATAR
 ------------------------------------------------------------
-local HEADLESS_HEAD = 134082579
-local KORBLOX_LEG  = 139607718
-
 local AVATAR_ITEMS = {
     { key = "headless", name = "Headless",                      mode = "headless" },
     { key = "korblox",  name = "Korblox",                       mode = "korblox" },
@@ -225,46 +222,45 @@ local function getHumanoid()
     return char:FindFirstChildOfClass("Humanoid")
 end
 
-local function getBaseDescription()
-    local ok, desc = pcall(function()
-        return Players:GetHumanoidDescriptionFromUserId(LP.UserId)
-    end)
-    if ok and desc then
-        return desc
-    end
-    local hum = getHumanoid()
-    if hum then
-        local ok2, desc2 = pcall(function() return hum:GetAppliedDescription() end)
-        if ok2 and desc2 then return desc2 end
-    end
-    return Instance.new("HumanoidDescription")
-end
+local HEADLESS_MESH = "rbxassetid://1095708"
 
 local function setHeadlessVisual(on)
     local char = getCharacter()
     if not char then return end
     local head = char:FindFirstChild("Head")
     if not head then return end
-    head.Transparency = on and 1 or 0
-    for _, d in ipairs(head:GetDescendants()) do
-        if d:IsA("Decal") then
-            d.Transparency = on and 1 or 0
+
+    if on then
+        pcall(function() head.Transparency = 1 end)
+        for _, d in ipairs(head:GetDescendants()) do
+            if d:IsA("Decal") then pcall(function() d.Transparency = 1 end) end
+        end
+        if not head:FindFirstChild("LarpHeadless") then
+            local m = Instance.new("SpecialMesh")
+            m.Name = "LarpHeadless"
+            m.MeshType = Enum.MeshType.FileMesh
+            m.MeshId = HEADLESS_MESH
+            m.Scale = Vector3.new(0.001, 0.001, 0.001)
+            m.Parent = head
+        end
+    else
+        local m = head:FindFirstChild("LarpHeadless")
+        if m then m:Destroy() end
+        pcall(function() head.Transparency = 0 end)
+        for _, d in ipairs(head:GetDescendants()) do
+            if d:IsA("Decal") then pcall(function() d.Transparency = 0 end) end
         end
     end
 end
 
-local KORBLOX_MESH = {
-    upper   = "rbxassetid://902942096",
-    lower   = "rbxassetid://902942093",
-    foot    = "rbxassetid://902942089",
-    texture = "rbxassetid://902843398",
-}
+-- Mesh korblox: R6 -> ganti "Right Leg"; R15 -> mesh kaki kanan penuh
+local KORBLOX_MESH      = "rbxassetid://902942096"
+local KORBLOX_TEXTURE   = "rbxassetid://902843398"
+local KORBLOX_R15_UPPER = "rbxassetid://9598310133"
 
--- Ukuran part bantuan korblox (R15). Ubah di sini kalau terlihat
--- kegedean / kekecilan. scale dipakai untuk SpecialMesh FileMesh.
+-- Part bantuan dipakai hanya kalau executor tidak bisa menulis MeshId.
 local KORBLOX_FALLBACK = {
     size  = Vector3.new(1, 2, 1),
-    scale = Vector3.new(1, 1, 1),
     color = Color3.fromRGB(30, 30, 30),
 }
 
@@ -297,30 +293,53 @@ local function setKorbloxVisual(on)
     if not on then
         for _, n in ipairs(KORBLOX_PARTS) do
             local p = char:FindFirstChild(n)
-            if p then p.Transparency = 0 end
+            if p then
+                pcall(function() p.Transparency = 0 end)
+                local orig = p:GetAttribute("LarpOrigMesh")
+                if orig and p:IsA("MeshPart") then
+                    pcall(function() p.MeshId = orig end)
+                end
+            end
         end
         return
     end
 
-    -- R6 : cukup ganti mesh pada "Right Leg" yang sudah ada
+    -- R6 : "Right Leg" adalah Part biasa -> pasang SpecialMesh korblox
     local r6 = char:FindFirstChild("Right Leg")
-    if r6 and r6:IsA("BasePart") then
+    if r6 and r6:IsA("BasePart") and not r6:IsA("MeshPart") then
         local mesh = Instance.new("SpecialMesh")
         mesh.Name = "LarpKorbloxMesh"
         mesh.MeshType = Enum.MeshType.FileMesh
-        mesh.MeshId = KORBLOX_MESH.upper
-        mesh.TextureId = KORBLOX_MESH.texture
+        mesh.MeshId = KORBLOX_MESH
+        mesh.TextureId = KORBLOX_TEXTURE
         mesh.Parent = r6
-        r6.Color = Color3.fromRGB(30, 30, 30)
+        pcall(function() r6.Color = KORBLOX_FALLBACK.color end)
         return
     end
 
-    -- R15 : MeshId part asli read-only, jadi sembunyikan kaki lalu buat part korblox sendiri
+    -- R15 : tulis MeshId langsung (executor umumnya mengizinkan)
     local upper = char:FindFirstChild("RightUpperLeg")
     if not upper or not upper:IsA("BasePart") then return end
     local lower = char:FindFirstChild("RightLowerLeg")
     local foot = char:FindFirstChild("RightFoot")
 
+    local applied = false
+    if upper:IsA("MeshPart") then
+        pcall(function() upper:SetAttribute("LarpOrigMesh", upper.MeshId) end)
+        pcall(function()
+            upper.MeshId = KORBLOX_R15_UPPER
+            upper.TextureID = KORBLOX_TEXTURE
+        end)
+        applied = upper.MeshId == KORBLOX_R15_UPPER
+    end
+
+    if applied then
+        if lower then pcall(function() lower.Transparency = 1 end) end
+        if foot then pcall(function() foot.Transparency = 1 end) end
+        return
+    end
+
+    -- Fallback : sembunyikan kaki asli, buat part korblox lalu weld
     local hack = Instance.new("Part")
     hack.Name = "LarpKorbloxLeg"
     hack.Size = KORBLOX_FALLBACK.size
@@ -337,9 +356,8 @@ local function setKorbloxVisual(on)
 
     local mesh = Instance.new("SpecialMesh")
     mesh.MeshType = Enum.MeshType.FileMesh
-    mesh.MeshId = KORBLOX_MESH.upper
-    mesh.TextureId = KORBLOX_MESH.texture
-    mesh.Scale = KORBLOX_FALLBACK.scale
+    mesh.MeshId = KORBLOX_MESH
+    mesh.TextureId = KORBLOX_TEXTURE
     mesh.Parent = hack
 
     hack.Parent = char
@@ -349,7 +367,7 @@ local function setKorbloxVisual(on)
     weld.Parent = hack
 
     for _, p in ipairs({ upper, lower, foot }) do
-        if p then p.Transparency = 1 end
+        if p then pcall(function() p.Transparency = 1 end) end
     end
 end
 
@@ -404,54 +422,13 @@ local function applyAccessories()
     return okCount, failCount
 end
 
-local useFallback = false
-
-local function buildDescription(withAccessories)
-    local desc = getBaseDescription()
-    if state.headless then desc.Head = HEADLESS_HEAD end
-    if state.korblox  then desc.RightLeg = KORBLOX_LEG end
-    if withAccessories then
-        local grouped = {}
-        for _, it in ipairs(AVATAR_ITEMS) do
-            if it.asset and it.slot and state.items[it.key] then
-                grouped[it.slot] = grouped[it.slot] or {}
-                table.insert(grouped[it.slot], tostring(it.asset))
-            end
-        end
-        for slot, list in pairs(grouped) do
-            desc[slot] = table.concat(list, ",")
-        end
-    end
-    return desc
-end
-
 local function applyAvatar()
     local hum = getHumanoid()
     if not hum then return end
 
-    clearKorbloxHack()
+    setHeadlessVisual(state.headless)
+    setKorbloxVisual(state.korblox)
 
-    -- 1) cara resmi: semua (head/korblox/aksesoris) lewat HumanoidDescription
-    local okFull = pcall(function() hum:ApplyDescription(buildDescription(true)) end)
-    if okFull then
-        useFallback = false
-        if not state.headless then setHeadlessVisual(false) end
-        clearAccessories()
-        return
-    end
-
-    -- 2) deskripsi gagal (mungkin krn slot aksesoris / game blokir)
-    local okBody = pcall(function() hum:ApplyDescription(buildDescription(false)) end)
-    useFallback = not okBody
-    if okBody then
-        if not state.headless then setHeadlessVisual(false) end
-    else
-        setHeadlessVisual(state.headless)
-        setKorbloxVisual(state.korblox)
-        notify("Avatar", "Game blokir avatar - pakai mode visual")
-    end
-
-    -- 3) aksesoris dipasang manual
     local okCount, failCount = applyAccessories()
     if failCount > 0 then
         notify("Item", ("%d berhasil, %d gagal dipasang"):format(okCount, failCount))
@@ -467,6 +444,21 @@ local function hasKorbloxHack()
         end
     end
     return false
+end
+
+local function korbloxApplied()
+    local char = getCharacter()
+    if not char then return false end
+    local r6 = char:FindFirstChild("Right Leg")
+    if r6 and r6:IsA("BasePart") and not r6:IsA("MeshPart") then
+        return r6:FindFirstChild("LarpKorbloxMesh") ~= nil
+    end
+    local upper = char:FindFirstChild("RightUpperLeg")
+    if not upper then return false end
+    if upper:IsA("MeshPart") and upper.MeshId == KORBLOX_R15_UPPER then
+        return true
+    end
+    return hasKorbloxHack()
 end
 
 ------------------------------------------------------------
@@ -1113,15 +1105,15 @@ end))
 task.spawn(function()
     while _G.__LarpingHub == gui and gui.Parent do
         task.wait(3)
-        if useFallback and (state.headless or state.korblox) then
+        if state.headless then
             local char = getCharacter()
             local head = char and char:FindFirstChild("Head")
-            if state.headless and head and head.Transparency < 1 then
+            if head and head.Transparency < 1 then
                 setHeadlessVisual(true)
             end
-            if state.korblox and not hasKorbloxHack() then
-                setKorbloxVisual(true)
-            end
+        end
+        if state.korblox and not korbloxApplied() then
+            setKorbloxVisual(true)
         end
     end
 end)
