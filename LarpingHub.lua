@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v18"
+local VERSION = "v19"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -535,9 +535,41 @@ local function loadAccessoryModel(id)
     return nil
 end
 
+local function weldAccessoryTo(acc, char)
+    local handle = acc:FindFirstChildWhichIsA("BasePart")
+    if not handle then return false end
+    local at = acc.AccessoryType
+    local target
+    if at == Enum.AccessoryType.Shoulders or at == Enum.AccessoryType.Back or at == Enum.AccessoryType.Neck then
+        target = findPart(char, "Torso") or findPart(char, "UpperTorso") or findPart(char, "LowerTorso") or findPart(char, "HumanoidRootPart")
+    else
+        target = findHead(char) or findPart(char, "Torso") or findPart(char, "HumanoidRootPart")
+    end
+    if not target then return false end
+    local originalOffset
+    pcall(function()
+        handle.Anchored = false
+        originalOffset = target.CFrame:Inverse() * handle.CFrame
+    end)
+    if not originalOffset then return false end
+    for _, j in ipairs(handle:GetChildren()) do
+        if j:IsA("Weld") and j.Part1 == handle then
+            pcall(function() j:Destroy() end)
+        end
+    end
+    local weld = Instance.new("Weld")
+    weld.Name = "LarpAccessoryWeld"
+    weld.Part0 = target
+    weld.Part1 = handle
+    weld.C0 = originalOffset
+    weld.C1 = CFrame.new()
+    weld.Parent = handle
+    return true
+end
+
 local function applyAccessories()
-    local hum = getHumanoid()
-    if not hum then return 0, 0 end
+    local char = getCharacter()
+    if not char then return 0, 0 end
     clearAccessories()
     local okCount, failCount = 0, 0
     for _, it in ipairs(AVATAR_ITEMS) do
@@ -545,8 +577,13 @@ local function applyAccessories()
             local acc = loadAccessoryModel(it.asset)
             if acc then
                 acc:SetAttribute("LarpingHubItem", true)
-                local ok = pcall(function() hum:AddAccessory(acc) end)
-                if ok then
+                local moved = false
+                pcall(function()
+                    acc.Parent = char
+                    moved = true
+                end)
+                if not moved then acc:Destroy() failCount = failCount + 1
+                elseif weldAccessoryTo(acc, char) then
                     okCount = okCount + 1
                 else
                     acc:Destroy()
@@ -1299,6 +1336,25 @@ task.spawn(function()
                         lockHidden(findPart(char, "RightFoot"))
                         if upper.MeshId ~= KORBLOX_R15_UPPER then
                             setKorbloxVisual(true)
+                        end
+                    end
+                end
+                if state.korblox then
+                    local r6 = findPart(char, "Right Leg")
+                    local hackPart
+                    for _, d in ipairs(char:GetDescendants()) do
+                        if d:IsA("BasePart") and d:GetAttribute("LarpKorbloxLeg") then
+                            hackPart = d
+                            break
+                        end
+                    end
+                    if r6 and hackPart then
+                        hackPart.CFrame = r6.CFrame
+                        if not hackPart:FindFirstChildWhichIsA("WeldConstraint") then
+                            local wd = Instance.new("WeldConstraint")
+                            wd.Part0 = r6
+                            wd.Part1 = hackPart
+                            wd.Parent = hackPart
                         end
                     end
                 end
