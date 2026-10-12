@@ -43,16 +43,16 @@ end
 -- TEMA
 ------------------------------------------------------------
 local COL = {
-    bg      = Color3.fromRGB(14, 14, 19),
-    panel   = Color3.fromRGB(22, 22, 30),
-    panel2  = Color3.fromRGB(30, 30, 41),
-    row     = Color3.fromRGB(27, 27, 36),
-    accent  = Color3.fromRGB(126, 92, 255),
-    accent2 = Color3.fromRGB(92, 62, 210),
-    text    = Color3.fromRGB(236, 236, 245),
-    sub     = Color3.fromRGB(148, 148, 168),
-    stroke  = Color3.fromRGB(46, 46, 60),
-    rail    = Color3.fromRGB(62, 62, 80),
+    bg      = Color3.fromRGB(32, 28, 50),
+    panel   = Color3.fromRGB(42, 37, 66),
+    panel2  = Color3.fromRGB(54, 48, 84),
+    row     = Color3.fromRGB(48, 43, 72),
+    accent  = Color3.fromRGB(140, 106, 255),
+    accent2 = Color3.fromRGB(99, 70, 214),
+    text    = Color3.fromRGB(242, 240, 252),
+    sub     = Color3.fromRGB(180, 174, 208),
+    stroke  = Color3.fromRGB(70, 63, 104),
+    rail    = Color3.fromRGB(84, 77, 122),
     white   = Color3.fromRGB(255, 255, 255),
 }
 local FONT  = Enum.Font.GothamMedium
@@ -362,23 +362,33 @@ local function clearAccessories()
     end
 end
 
+local function loadAccessoryModel(id)
+    local tries = {
+        function() return game:GetObjects("rbxassetid://" .. tostring(id)) end,
+        function() return { InsertService:LoadAsset(id) } end,
+    }
+    for _, fn in ipairs(tries) do
+        local ok, res = pcall(fn)
+        if ok and type(res) == "table" and res[1] then
+            local obj = res[1]
+            local acc = obj:IsA("Accessory") and obj or obj:FindFirstChildWhichIsA("Accessory", true)
+            if acc then return acc end
+        end
+    end
+    return nil
+end
+
 local function applyAccessories()
     local hum = getHumanoid()
     if not hum then return end
     clearAccessories()
     for _, it in ipairs(AVATAR_ITEMS) do
-        if it.asset and state.items[it.key] then
-            local ok, model = pcall(function()
-                return InsertService:LoadAsset(it.asset)
-            end)
-            if ok and model then
-                local acc = model:FindFirstChildWhichIsA("Accessory")
-                if acc then
-                    acc:SetAttribute("LarpingHubItem", true)
-                    local ok2 = pcall(function() hum:AddAccessory(acc) end)
-                    if not ok2 then acc:Destroy() end
-                end
-                model:Destroy()
+        if it.asset and it.slot and state.items[it.key] then
+            local acc = loadAccessoryModel(it.asset)
+            if acc then
+                acc:SetAttribute("LarpingHubItem", true)
+                local ok = pcall(function() hum:AddAccessory(acc) end)
+                if not ok then acc:Destroy() end
             end
         end
     end
@@ -386,25 +396,51 @@ end
 
 local useFallback = false
 
+local function buildDescription(withAccessories)
+    local desc = getBaseDescription()
+    if state.headless then desc.Head = HEADLESS_HEAD end
+    if state.korblox  then desc.RightLeg = KORBLOX_LEG end
+    if withAccessories then
+        local grouped = {}
+        for _, it in ipairs(AVATAR_ITEMS) do
+            if it.asset and it.slot and state.items[it.key] then
+                grouped[it.slot] = grouped[it.slot] or {}
+                table.insert(grouped[it.slot], tostring(it.asset))
+            end
+        end
+        for slot, list in pairs(grouped) do
+            desc[slot] = table.concat(list, ",")
+        end
+    end
+    return desc
+end
+
 local function applyAvatar()
     local hum = getHumanoid()
     if not hum then return end
 
     clearKorbloxHack()
 
-    local desc = getBaseDescription()
-    if state.headless then desc.Head = HEADLESS_HEAD end
-    if state.korblox  then desc.RightLeg = KORBLOX_LEG end
+    -- 1) cara resmi: semua (head/korblox/aksesoris) lewat HumanoidDescription
+    local okFull = pcall(function() hum:ApplyDescription(buildDescription(true)) end)
+    if okFull then
+        useFallback = false
+        if not state.headless then setHeadlessVisual(false) end
+        clearAccessories()
+        return
+    end
 
-    local ok = pcall(function() hum:ApplyDescription(desc) end)
-    useFallback = not ok
-    if ok then
+    -- 2) deskripsi gagal (mungkin krn slot aksesoris / game blokir)
+    local okBody = pcall(function() hum:ApplyDescription(buildDescription(false)) end)
+    useFallback = not okBody
+    if okBody then
         if not state.headless then setHeadlessVisual(false) end
     else
         setHeadlessVisual(state.headless)
         setKorbloxVisual(state.korblox)
     end
 
+    -- 3) aksesoris dipasang manual
     applyAccessories()
 end
 
@@ -505,6 +541,7 @@ local ballImg = new("ImageButton", ballHolder, {
     AutoButtonColor = false,
     ZIndex = 2,
 })
+corner(ballImg, 28)
 if not BALL_IMG then
     new("TextLabel", ballHolder, {
         Size = UDim2.new(1, 0, 1, 0),
@@ -528,18 +565,28 @@ local win = new("Frame", gui, {
     Position = UDim2.fromScale(0.5, 0.5),
     Size = UDim2.fromOffset(W, H),
     BackgroundColor3 = COL.bg,
+    BackgroundTransparency = 0,
     BorderSizePixel = 0,
     ClipsDescendants = true,
     Visible = false,
 })
 corner(win, 14)
 stroke(win, COL.stroke, 1)
+new("UIGradient", win, {
+    Rotation = 90,
+    Color = ColorSequence.new(Color3.fromRGB(56, 49, 88), Color3.fromRGB(28, 24, 44)),
+})
 
 -- HEADER
 local header = new("Frame", win, {
     Size = UDim2.new(1, 0, 0, 48),
-    BackgroundColor3 = COL.panel,
+    BackgroundColor3 = COL.panel2,
     BorderSizePixel = 0,
+    Active = true,
+})
+new("UIGradient", header, {
+    Rotation = 90,
+    Color = ColorSequence.new(Color3.fromRGB(62, 54, 96), Color3.fromRGB(40, 35, 62)),
 })
 new("Frame", header, {
     Size = UDim2.new(1, 0, 0, 2),
@@ -992,6 +1039,35 @@ track(UIS.InputEnded:Connect(function(input)
         if not dragMoved then
             toggleHub()
         end
+    end
+end))
+
+------------------------------------------------------------
+-- WINDOW DRAG (geser hub lewat header)
+------------------------------------------------------------
+local winDragging = false
+local winDragStart, winStartPos
+
+track(header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        winDragging = true
+        winDragStart = input.Position
+        winStartPos = win.AbsolutePosition
+        win.AnchorPoint = Vector2.new(0, 0)
+        win.Position = UDim2.fromOffset(winStartPos.X, winStartPos.Y)
+    end
+end))
+
+track(UIS.InputChanged:Connect(function(input)
+    if winDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - winDragStart
+        win.Position = UDim2.fromOffset(winStartPos.X + delta.X, winStartPos.Y + delta.Y)
+    end
+end))
+
+track(UIS.InputEnded:Connect(function(input)
+    if winDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        winDragging = false
     end
 end))
 
