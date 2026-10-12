@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v20"
+local VERSION = "v21"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -442,6 +442,7 @@ local function setKorbloxVisual(on)
         mesh.MeshType = Enum.MeshType.FileMesh
         mesh.MeshId = KORBLOX_MESH
         mesh.TextureId = KORBLOX_TEXTURE
+        mesh.Offset = Vector3.new(0, 0.6, 0)
         mesh.Parent = hack
         hack.CFrame = r6.CFrame
         hack.Parent = char
@@ -554,6 +555,9 @@ local function weldAccessoryTo(acc, char)
         originalOffset = target.CFrame:Inverse() * handle.CFrame
     end)
     if not originalOffset then return false end
+    if originalOffset.Position.Magnitude > 15 then
+        originalOffset = CFrame.new(0, 1.1, 0)
+    end
     for _, j in ipairs(handle:GetChildren()) do
         if j:IsA("Weld") and j.Part1 == handle then
             pcall(function() j:Destroy() end)
@@ -569,9 +573,30 @@ local function weldAccessoryTo(acc, char)
     return true
 end
 
+local function ensureAttachments(char)
+    local head = findHead(char)
+    if head and not head:FindFirstChild("HeadAttachment") then
+        local a = Instance.new("Attachment")
+        a.Name = "HeadAttachment"
+        a.Position = Vector3.new(0, 0.5, 0)
+        a.Parent = head
+    end
+    local torso = findPart(char, "Torso") or findPart(char, "UpperTorso")
+    if torso then
+        for _, n in ipairs({ "NeckAttachment", "WaistAttachment", "RightShoulderAttachment", "LeftShoulderAttachment" }) do
+            if not torso:FindFirstChild(n) then
+                local a = Instance.new("Attachment")
+                a.Name = n
+                a.Parent = torso
+            end
+        end
+    end
+end
+
 local function applyAccessories()
-    local char = getCharacter()
+    local char, hum = getCharacter(), getHumanoid()
     if not char then return 0, 0 end
+    ensureAttachments(char)
     clearAccessories()
     local okCount, failCount = 0, 0
     for _, it in ipairs(AVATAR_ITEMS) do
@@ -584,10 +609,21 @@ local function applyAccessories()
                     acc.Parent = char
                     moved = true
                 end)
-                if not moved then acc:Destroy() failCount = failCount + 1
-                elseif weldAccessoryTo(acc, char) then
-                    okCount = okCount + 1
-                else
+                local done = false
+                if moved then
+                    if hum then
+                        local okAdd = pcall(function() hum:AddAccessory(acc) end)
+                        if okAdd then
+                            okCount = okCount + 1
+                            done = true
+                        end
+                    end
+                    if not done and weldAccessoryTo(acc, char) then
+                        okCount = okCount + 1
+                        done = true
+                    end
+                end
+                if not done then
                     acc:Destroy()
                     failCount = failCount + 1
                 end
