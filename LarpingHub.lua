@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v17"
+local VERSION = "v18"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
