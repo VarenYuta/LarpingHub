@@ -1119,6 +1119,29 @@ task.spawn(function()
 end)
 
 ------------------------------------------------------------
+-- DIAGNOSTIK (detail di console F9)
+------------------------------------------------------------
+task.spawn(function()
+    task.wait(1)
+    local char = getCharacter()
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local rig = "?"
+    if hum then
+        rig = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
+    end
+    local hasHead = (char and char:FindFirstChild("Head")) and "ada" or "tidak"
+    local hasLeg  = (char and (char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg"))) and "ada" or "tidak"
+    local lvl = "?"
+    pcall(function() lvl = tostring(getidentity()) end)
+    local cap = {}
+    if getcustomasset then table.insert(cap, "customasset") end
+    if game.GetObjects then table.insert(cap, "GetObjects") end
+    print(("[LarpingHub] char=%s rig=%s head=%s kaki=%s identity=%s cap=%s"):format(
+        tostring(char ~= nil), rig, hasHead, hasLeg, lvl, table.concat(cap, ",")))
+    notify("Diagnostik", ("Rig %s | kepala %s | kaki %s | lvl %s"):format(rig, hasHead, hasLeg, lvl))
+end)
+
+------------------------------------------------------------
 -- START
 ------------------------------------------------------------
 selectTab(1)
