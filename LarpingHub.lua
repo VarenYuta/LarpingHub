@@ -19,6 +19,8 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
+local VERSION = "v8"
+
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
 ------------------------------------------------------------
@@ -223,6 +225,7 @@ local function getHumanoid()
 end
 
 local HEADLESS_MESH = "rbxassetid://1095708"
+local headLocks = setmetatable({}, { __mode = "k" })
 
 local function setHeadlessVisual(on)
     local char = getCharacter()
@@ -242,6 +245,15 @@ local function setHeadlessVisual(on)
             m.MeshId = HEADLESS_MESH
             m.Scale = Vector3.new(0.001, 0.001, 0.001)
             m.Parent = head
+        end
+        if not headLocks[head] then
+            pcall(function()
+                headLocks[head] = head:GetPropertyChangedSignal("Transparency"):Connect(function()
+                    if state.headless and head.Transparency < 1 then
+                        head.Transparency = 1
+                    end
+                end)
+            end)
         end
     else
         local m = head:FindFirstChild("LarpHeadless")
@@ -624,7 +636,7 @@ new("TextLabel", header, {
     TextSize = 11,
     TextColor3 = COL.accent,
     TextXAlignment = Enum.TextXAlignment.Left,
-    Text = "By Varen",
+    Text = "By Varen • " .. VERSION,
 })
 
 local minimizeBtn = new("TextButton", header, {
@@ -1134,16 +1146,18 @@ task.spawn(function()
     if hum then
         rig = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
     end
-    local hasHead = (char and char:FindFirstChild("Head")) and "ada" or "tidak"
-    local hasLeg  = (char and (char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg"))) and "ada" or "tidak"
+    local head = char and char:FindFirstChild("Head")
+    local leg  = char and (char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg"))
+    local hasHead = head and "ada" or "tidak"
+    local hasLeg  = leg and "ada" or "tidak"
     local lvl = "?"
     pcall(function() lvl = tostring(getidentity()) end)
     local cap = {}
     if getcustomasset then table.insert(cap, "customasset") end
     if game.GetObjects then table.insert(cap, "GetObjects") end
-    print(("[LarpingHub] char=%s rig=%s head=%s kaki=%s identity=%s cap=%s"):format(
-        tostring(char ~= nil), rig, hasHead, hasLeg, lvl, table.concat(cap, ",")))
-    notify("Diagnostik", ("Rig %s | kepala %s | kaki %s | lvl %s"):format(rig, hasHead, hasLeg, lvl))
+    print(("[LarpingHub %s] char=%s rig=%s head=%s kaki=%s identity=%s cap=%s"):format(
+        VERSION, tostring(char ~= nil), rig, hasHead, hasLeg, lvl, table.concat(cap, ",")))
+    notify("Diagnostik " .. VERSION, ("%s | kepala %s | kaki %s | lvl %s"):format(rig, hasHead, hasLeg, lvl))
 end)
 
 ------------------------------------------------------------
