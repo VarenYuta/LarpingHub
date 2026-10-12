@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v21"
+local VERSION = "v22"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -596,41 +596,59 @@ end
 local function applyAccessories()
     local char, hum = getCharacter(), getHumanoid()
     if not char then return 0, 0 end
-    ensureAttachments(char)
-    clearAccessories()
+
+    local errAcc = {}
+    local okAtt, erAtt = pcall(ensureAttachments, char)
+    if not okAtt then table.insert(errAcc, "attachment: " .. tostring(erAtt):sub(1, 140)) end
+
+    local okCl, erCl = pcall(clearAccessories)
+    if not okCl then table.insert(errAcc, "bersih: " .. tostring(erCl):sub(1, 140)) end
+
     local okCount, failCount = 0, 0
     for _, it in ipairs(AVATAR_ITEMS) do
         if it.asset and it.slot and state.items[it.key] then
-            local acc = loadAccessoryModel(it.asset)
-            if acc then
+            local okLoad, acc = pcall(loadAccessoryModel, it.asset)
+            if not okLoad or not acc then
+                if not okLoad then table.insert(errAcc, ("muat[%s]: %s"):format(it.key, tostring(acc):sub(1, 140))) end
+                failCount = failCount + 1
+            else
                 acc:SetAttribute("LarpingHubItem", true)
                 local moved = false
-                pcall(function()
-                    acc.Parent = char
-                    moved = true
-                end)
+                local okMv, erMv = pcall(function() acc.Parent = char end)
+                if okMv then moved = true
+                else table.insert(errAcc, ("pindah[%s]: %s"):format(it.key, tostring(erMv):sub(1, 140))) end
+
                 local done = false
-                if moved then
-                    if hum then
-                        local okAdd = pcall(function() hum:AddAccessory(acc) end)
-                        if okAdd then
-                            okCount = okCount + 1
-                            done = true
-                        end
-                    end
-                    if not done and weldAccessoryTo(acc, char) then
+                if moved and hum then
+                    local okAdd, erAdd = pcall(function() hum:AddAccessory(acc) end)
+                    if okAdd then
                         okCount = okCount + 1
                         done = true
+                    else
+                        table.insert(errAcc, ("add[%s]: %s"):format(it.key, tostring(erAdd):sub(1, 140)))
+                    end
+                end
+                if moved and not done then
+                    local okW, resW = pcall(weldAccessoryTo, acc, char)
+                    if okW and resW then
+                        okCount = okCount + 1
+                        done = true
+                    elseif not okW then
+                        table.insert(errAcc, ("weld[%s]: %s"):format(it.key, tostring(resW):sub(1, 140)))
                     end
                 end
                 if not done then
                     acc:Destroy()
                     failCount = failCount + 1
                 end
-            else
-                failCount = failCount + 1
             end
         end
+    end
+
+    if #errAcc > 0 then
+        lastErr = table.concat(errAcc, " | ")
+        warn("[LarpingHub] " .. lastErr)
+        notify("Item Error", errAcc[1]:sub(1, 300))
     end
     return okCount, failCount
 end
