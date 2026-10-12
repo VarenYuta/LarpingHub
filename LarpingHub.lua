@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v19"
+local VERSION = "v20"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -206,6 +206,8 @@ local state = {
     autoEquip = false,
     items     = {},
 }
+
+local lastErr = nil
 
 ------------------------------------------------------------
 -- LOGIKA AVATAR
@@ -599,15 +601,32 @@ end
 
 local function applyAvatar()
     local function run()
-        local ok, err, okA, failA = pcall(function()
-            setHeadlessVisual(state.headless)
-            setKorbloxVisual(state.korblox)
-            return applyAccessories()
+        local ok, err
+        local okA, failA
+
+        ok, err = pcall(setHeadlessVisual, state.headless)
+        if not ok then
+            lastErr = ("headless: %s"):format(tostring(err))
+            warn("[LarpingHub] " .. lastErr)
+        end
+
+        ok, err = pcall(setKorbloxVisual, state.korblox)
+        if not ok then
+            lastErr = ("korblox: %s"):format(tostring(err))
+            warn("[LarpingHub] " .. lastErr)
+            notify("Korblox Error", tostring(err):sub(1, 160))
+        end
+
+        ok, err = pcall(function()
+            okA, failA = applyAccessories()
         end)
         if not ok then
-            warn("[LarpingHub] " .. tostring(err))
-            notify("Error", tostring(err):sub(1, 70))
-        elseif okA and (okA > 0 or failA > 0) then
+            lastErr = ("item: %s"):format(tostring(err))
+            warn("[LarpingHub] " .. lastErr)
+            notify("Item Error", tostring(err):sub(1, 160))
+        end
+
+        if okA and (okA > 0 or failA > 0) then
             if failA == 0 then
                 notify("Item", okA .. " item terpasang")
             else
@@ -1349,7 +1368,6 @@ task.spawn(function()
                         end
                     end
                     if r6 and hackPart then
-                        hackPart.CFrame = r6.CFrame
                         if not hackPart:FindFirstChildWhichIsA("WeldConstraint") then
                             local wd = Instance.new("WeldConstraint")
                             wd.Part0 = r6
@@ -1453,9 +1471,9 @@ task.spawn(function()
         local anakLine = (#anakTxt > 0) and table.concat(anakTxt, " • ") or "kosong"
         local partLine = (#partTxt > 0) and table.concat(partTxt, " • ") or "kosong"
         local lpChar = LP.Character and ("ada:" .. LP.Character.Name) or "nil"
-        statusLabel.Text = ("lp: %s\nchar: %s\nrig: %s\nkepala: %s\nkorblox: %s\npart: %s\nanak: %s\nlvl: %s"):format(
+        statusLabel.Text = ("lp: %s\nchar: %s\nrig: %s\nkepala: %s\nkorblox: %s\npart: %s\nanak: %s\nlvl: %s\nerr: %s"):format(
             lpChar, char and char.Name or "TIDAK", rig, headTxt,
-            kxTxt, partLine, anakLine, lvl)
+            kxTxt, partLine, anakLine, lvl, lastErr or "-")
         task.wait(1)
     end
 end)
