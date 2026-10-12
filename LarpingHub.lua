@@ -19,7 +19,7 @@ local InsertService = game:GetService("InsertService")
 
 local LP = Players.LocalPlayer
 
-local VERSION = "v12"
+local VERSION = "v13"
 
 ------------------------------------------------------------
 -- BERSIHKAN INSTANCE LAMA
@@ -252,6 +252,24 @@ local function setHidden(part, on)
     end)
 end
 
+local korbloxLocks = setmetatable({}, { __mode = "k" })
+
+local function lockHidden(part)
+    if not part or korbloxLocks[part] then return end
+    pcall(function()
+        korbloxLocks[part] = part:GetPropertyChangedSignal("Transparency"):Connect(function()
+            if state.korblox and part.Transparency < 1 then
+                part.Transparency = 1
+            end
+        end)
+        part:GetPropertyChangedSignal("LocalTransparencyModifier"):Connect(function()
+            if state.korblox and part.LocalTransparencyModifier < 1 then
+                part.LocalTransparencyModifier = 1
+            end
+        end)
+    end)
+end
+
 local function setHeadAccessories(on)
     local char = getCharacter()
     if not char then return end
@@ -405,6 +423,8 @@ local function setKorbloxVisual(on)
         setHidden(upper, false)
         setHidden(lower, true)
         setHidden(foot, true)
+        lockHidden(lower)
+        lockHidden(foot)
         return
     end
 
@@ -437,6 +457,7 @@ local function setKorbloxVisual(on)
 
     for _, p in ipairs({ upper, lower, foot }) do
         setHidden(p, true)
+        lockHidden(p)
     end
 end
 
@@ -1299,9 +1320,13 @@ task.spawn(function()
         local leg  = char and findPart(char, "RightUpperLeg", "Right Leg")
         local lvl = "?"
         pcall(function() lvl = tostring(getidentity()) end)
-        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkaki: %s\nlvl: %s"):format(
-            char and "ada" or "TIDAK", rig, head and "ada" or "TIDAK",
-            leg and "ada" or "TIDAK", lvl)
+        local headTxt = "TIDAK"
+        if head then headTxt = (head.Transparency >= 1) and "hilang" or "kelihatan" end
+        local kxTxt = "-"
+        if state.korblox then kxTxt = korbloxApplied() and "OK" or "GAGAL" end
+        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkaki: %s\nkorblox: %s\nlvl: %s"):format(
+            char and "ada" or "TIDAK", rig, headTxt,
+            leg and "ada" or "TIDAK", kxTxt, lvl)
         task.wait(1)
     end
 end)
