@@ -360,8 +360,8 @@ local function setHeadlessVisual(on)
 end
 
 -- Mesh korblox: R6 -> ganti "Right Leg"; R15 -> mesh kaki kanan penuh
-local KORBLOX_MESH        = "rbxassetid://101851696"
-local KORBLOX_TEXTURE     = "rbxassetid://101851254"
+local KORBLOX_MESH        = "rbxassetid://902942096"
+local KORBLOX_TEXTURE     = "rbxassetid://902843398"
 local KORBLOX_R15_UPPER   = "rbxassetid://9598310133"
 local KORBLOX_R15_TEXTURE = "rbxassetid://902843398"
 
@@ -1396,8 +1396,9 @@ task.spawn(function()
         end
         local anakLine = (#anakTxt > 0) and table.concat(anakTxt, " • ") or "kosong"
         local partLine = (#partTxt > 0) and table.concat(partTxt, " • ") or "kosong"
-        statusLabel.Text = ("char: %s\nrig: %s\nkepala: %s\nkorblox: %s\npart: %s\nanak: %s\nlvl: %s"):format(
-            char and "ada" or "TIDAK", rig, headTxt,
+        local lpChar = LP.Character and ("ada:" .. LP.Character.Name) or "nil"
+        statusLabel.Text = ("lp: %s\nchar: %s\nrig: %s\nkepala: %s\nkorblox: %s\npart: %s\nanak: %s\nlvl: %s"):format(
+            lpChar, char and char.Name or "TIDAK", rig, headTxt,
             kxTxt, partLine, anakLine, lvl)
         task.wait(1)
     end
